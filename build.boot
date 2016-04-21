@@ -10,3 +10,8 @@
 (task-options!
  pom {:project 'beatthemarket
       :version "0.0.1"})
+
+(require '[beatthemarket.shell])
+
+(deftask run []
+  (beatthemarket.shell/start-server))
