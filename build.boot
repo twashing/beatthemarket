@@ -14,4 +14,6 @@
 (require '[beatthemarket.shell])
 
 (deftask run []
-  (beatthemarket.shell/start-server))
+  (with-pass-thru [_]
+    (beatthemarket.shell/start-server)))
+

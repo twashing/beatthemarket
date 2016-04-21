@@ -10,7 +10,7 @@ A Clojure library designed to ... well, that part is up to you.
 lein ring server-headless 80 
 docker run thing ring server-headless 80 
 
-boot cider replace
+boot cider repl
 ```
 
 ## License
