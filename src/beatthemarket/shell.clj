@@ -51,3 +51,23 @@
   ;; You may want to take a look: https://github.com/clojure/tools.namespace
   ;; and http://http-kit.org/migration.html#reload
   (start-server))
+
+
+
+(comment
+
+  (require '[chime :refer [chime-ch chime-at ]]
+           '[clj-time.periodic :refer [periodic-seq]]
+           '[clj-time.core :as t]
+           '[clojure.core.async :as a :refer [<! go-loop]])
+
+  (import '[yahoofinance YahooFinance])
+
+  (def one  (rest    ; excludes *right now*
+             (periodic-seq (t/now)
+                           (-> 1 t/seconds))))
+
+  (def two (chime-at one
+                     (fn [time]
+                       ;; (println "Chiming at" )
+                       (println (str time " IBM > " (YahooFinance/get "IBM")))))))
