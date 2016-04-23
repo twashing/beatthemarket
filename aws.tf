@@ -91,7 +91,7 @@ resource "aws_ecs_service" "beatthemarket_service" {
   task_definition = "${aws_ecs_task_definition.beatthemarket-task.arn}"
   desired_count   = 1
   iam_role = "${aws_iam_role.rolename.arn}"
-  # iam_instance_profile = "${aws_iam_instance_profile.rolename.id}"
+  depends_on = ["aws_iam_role_policy.rolename"]
   load_balancer {
     elb_name = "${aws_elb.beathemarket-elb.name}"
     container_name = "beatthemarket"
