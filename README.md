@@ -11,6 +11,9 @@ lein ring server-headless 80
 docker run thing ring server-headless 80 
 
 boot cider repl
+
+terraform apply -var "access_key=$AWS_ACCESS_KEY_ID" -var "secret_key=$AWS_SECRET_ACCESS_KEY"
+terraform destroy -var "access_key=$AWS_ACCESS_KEY_ID" -var "secret_key=$AWS_SECRET_ACCESS_KEY"
 ```
 
 ## License
