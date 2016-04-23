@@ -2,6 +2,49 @@
 variable "access_key" {}
 variable "secret_key" {}
 
+resource "aws_iam_role" "rolename" {
+    name = "WEB-mts"
+    assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_instance_profile" "rolename" {
+  name = "rolename"
+  roles = ["${aws_iam_role.rolename.name}"]
+}
+
+resource "aws_iam_role_policy" "rolename" {
+  name = "rolename"
+  role = "${aws_iam_role.rolename.id}"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeTags"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
 
 provider "aws" {
   region = "us-west-1"
@@ -38,55 +81,17 @@ resource "aws_elb" "beathemarket-elb" {
   }
 }
 
-resource "aws_iam_role_policy" "beatthemarket_policy" {
-    name = "beatthemarket_policy"
-    role = "${aws_iam_role.beatthemarket_role.id}"
-    policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": [
-        "ec2:Describe*"
-      ],
-      "Effect": "Allow",
-      "Resource": "*"
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_iam_role" "beatthemarket_role" {
-    name = "beatthemarket_role"
-    assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": "sts:AssumeRole",
-      "Principal": {
-        "Service": "ecs.amazonaws.com"
-      },
-      "Effect": "Allow",
-      "Sid": ""
-    }
-  ]
-}
-EOF
-}
-
 resource "aws_ecs_cluster" "default" {
   name = "beatthemarket"
 }
-
 
 resource "aws_ecs_service" "beatthemarket_service" {
   name            = "beatthemarket-service"
   cluster         = "${aws_ecs_cluster.default.id}"
   task_definition = "${aws_ecs_task_definition.beatthemarket-task.arn}"
   desired_count   = 1
-  iam_role = "${aws_iam_role.beatthemarket_role.arn}"
+  iam_role = "${aws_iam_role.rolename.arn}"
+  # iam_instance_profile = "${aws_iam_instance_profile.rolename.id}"
   load_balancer {
     elb_name = "${aws_elb.beathemarket-elb.name}"
     container_name = "beatthemarket"
