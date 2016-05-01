@@ -9,9 +9,11 @@
 
 
 ;; ===
-(defn index-handler
-  [request]
+(defn index-handler [request]
   (res/response "Homepage"))
+
+(defn landing-handler [request]
+  (res/response "Landing"))
 
 (def handler
   (let [{:keys [ch-recv send-fn ajax-post-fn
@@ -25,8 +27,9 @@
         connected-uids                connected-uids] ; Watchable, read-only atom
 
     (make-handler ["/" {"" index-handler
+                        "landing" landing-handler
                         {:get {"/chsk" (fn [req] (ring-ajax-get-or-ws-handshake req))}}
-                        {:post {"/chsk" (fn [req] (ring-ajax-post                req))}}}])))
+                        {:post {"/chsk" (fn [req] (ring-ajax-post               req))}}}])))
 
 (def app
   (-> handler
@@ -53,7 +56,6 @@
   (start-server))
 
 
-
 (comment
 
   (require '[chime :refer [chime-ch chime-at ]]
@@ -69,5 +71,15 @@
 
   (def two (chime-at one
                      (fn [time]
-                       ;; (println "Chiming at" )
-                       (println (str time " IBM > " (YahooFinance/get "IBM")))))))
+                       (println (str time " IBM > " (YahooFinance/get (into-array ["IBM" "AAPL" "YHOO"])))))))
+
+
+  ;; ====
+  (defn foo []
+    (let [one 1
+          two 2]
+      (* 10 (+ one two))))
+
+  (foo)
+
+  )

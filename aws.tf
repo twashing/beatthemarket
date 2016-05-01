@@ -2,8 +2,8 @@
 variable "access_key" {}
 variable "secret_key" {}
 
-resource "aws_iam_role" "rolename" {
-    name = "WEB-mts"
+resource "aws_iam_role" "beatthemarket" {
+    name = "beatthemarket"
     assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -11,7 +11,7 @@ resource "aws_iam_role" "rolename" {
     {
       "Action": "sts:AssumeRole",
       "Principal": {
-        "Service": "ec2.amazonaws.com"
+        "Service": "ecs.amazonaws.com"
       },
       "Effect": "Allow",
       "Sid": ""
@@ -21,22 +21,19 @@ resource "aws_iam_role" "rolename" {
 EOF
 }
 
-resource "aws_iam_instance_profile" "rolename" {
-  name = "rolename"
-  roles = ["${aws_iam_role.rolename.name}"]
-}
-
-resource "aws_iam_role_policy" "rolename" {
-  name = "rolename"
-  role = "${aws_iam_role.rolename.id}"
+resource "aws_iam_role_policy" "beatthemarket" {
+  name = "beatthemarket"
+  role = "${aws_iam_role.beatthemarket.id}"
   policy = <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Action": [
-        "ec2:DescribeInstances",
-        "ec2:DescribeTags"
+        "ec2:*",
+        "ecs:*",
+        "iam:*",
+        "elasticloadbalancing:*"
       ],
       "Effect": "Allow",
       "Resource": "*"
@@ -57,7 +54,7 @@ resource "aws_elb" "beathemarket-elb" {
   availability_zones = ["us-west-1a"]
 
   listener {
-    instance_port = 8000
+    instance_port = 80
     instance_protocol = "http"
     lb_port = 80
     lb_protocol = "http"
@@ -90,8 +87,8 @@ resource "aws_ecs_service" "beatthemarket_service" {
   cluster         = "${aws_ecs_cluster.default.id}"
   task_definition = "${aws_ecs_task_definition.beatthemarket-task.arn}"
   desired_count   = 1
-  iam_role = "${aws_iam_role.rolename.arn}"
-  depends_on = ["aws_iam_role_policy.rolename"]
+  iam_role = "${aws_iam_role.beatthemarket.arn}"
+  depends_on = ["aws_iam_role_policy.beatthemarket"]
   load_balancer {
     elb_name = "${aws_elb.beathemarket-elb.name}"
     container_name = "beatthemarket"
