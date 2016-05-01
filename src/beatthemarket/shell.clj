@@ -3,10 +3,41 @@
             [ring.util.response :as res]
             [ring.middleware.keyword-params]
             [ring.middleware.params]
-            [bidi.ring :refer [make-handler]]
-            [taoensso.sente :as sente]
-            [taoensso.sente.server-adapters.http-kit :refer (sente-web-server-adapter)]))
 
+            [compojure.core :refer [defroutes GET POST]]
+            [compojure.route :as route]
+            [compojure.handler :as handler]
+
+            [taoensso.sente :as sente]
+            [taoensso.sente.server-adapters.http-kit :refer (sente-web-server-adapter)]
+
+            [figwheel-sidecar.repl :as r]
+            [figwheel-sidecar.repl-api :as ra]))
+
+
+;; ===
+(defn start []
+  (ra/start-figwheel!
+   {:figwheel-options {} ;; <-- figwheel server config goes here
+    :build-ids ["dev"]   ;; <-- a vector of build ids to start autobuilding
+    :all-builds          ;; <-- supply your build configs here
+    [{:id "dev"
+      :figwheel true
+      :source-paths ["src"]
+      :compiler {:main "beatthemarket.client.core"
+                 :asset-path "js"
+                 :output-to "resources/public/js/main.js"
+                 :output-dir "resources/public/js"
+                 :verbose true}}]}))
+
+;; Please note that when you stop the Figwheel Server http-kit throws
+;; a java.util.concurrent.RejectedExecutionException, this is expected
+
+(defn stop []
+  (ra/stop-figwheel!))
+
+(defn repl []
+  (ra/cljs-repl))
 
 ;; ===
 (defn index-handler [request]
@@ -15,7 +46,7 @@
 (defn landing-handler [request]
   (res/response "Landing"))
 
-(def handler
+(def thing
   (let [{:keys [ch-recv send-fn ajax-post-fn
                 ajax-get-or-ws-handshake-fn connected-uids]}
         (sente/make-channel-socket! sente-web-server-adapter {})
@@ -26,15 +57,20 @@
         chsk-send!                    send-fn ; ChannelSocket's send API fn
         connected-uids                connected-uids] ; Watchable, read-only atom
 
-    (make-handler ["/" {"" index-handler
-                        "landing" landing-handler
-                        {:get {"/chsk" (fn [req] (ring-ajax-get-or-ws-handshake req))}}
-                        {:post {"/chsk" (fn [req] (ring-ajax-post               req))}}}])))
+    (defroutes routes
+      (GET "/" req (index-handler req))
+      (GET "/landing" req (landing-handler))
+
+      (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))
+      (POST "/chsk" req (ring-ajax-post               req))
+
+      (route/resources "/")
+      (route/not-found "Page not found"))))
 
 (def app
-  (-> handler
-      ring.middleware.keyword-params/wrap-keyword-params
-      ring.middleware.params/wrap-params))
+  (-> routes
+      (handler/site)))
+
 
 ;; ===
 (defonce server (atom nil))
@@ -58,28 +94,10 @@
 
 (comment
 
-  (require '[chime :refer [chime-ch chime-at ]]
-           '[clj-time.periodic :refer [periodic-seq]]
-           '[clj-time.core :as t]
-           '[clojure.core.async :as a :refer [<! go-loop]])
+  (start-server)
+  (start)
 
-  (import '[yahoofinance YahooFinance])
-
-  (def one  (rest    ; excludes *right now*
-             (periodic-seq (t/now)
-                           (-> 1 t/seconds))))
-
-  (def two (chime-at one
-                     (fn [time]
-                       (println (str time " IBM > " (YahooFinance/get (into-array ["IBM" "AAPL" "YHOO"])))))))
-
-
-  ;; ====
-  (defn foo []
-    (let [one 1
-          two 2]
-      (* 10 (+ one two))))
-
-  (foo)
+  (stop)
+  (stop-server)
 
   )
