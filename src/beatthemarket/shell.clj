@@ -1,16 +1,19 @@
 (ns beatthemarket.shell
-  (:require [org.httpkit.server :as server]
+  (:require [org.httpkit.server :as httpkit]
             [ring.util.response :as res]
-            [ring.middleware.keyword-params]
-            [ring.middleware.params]
+            [ring.middleware.params :as params]
+            [ring.middleware.defaults :as defaults]
 
-            [compojure.core :refer [defroutes GET POST]]
+            [compojure.core :as compojure :refer [defroutes GET POST]]
             [compojure.route :as route]
             [compojure.handler :as handler]
+            [clojure.core.async :as a :refer [<! >! put! close! go go-loop]]
+            [chord.http-kit :refer [wrap-websocket-handler with-channel]]
 
-            [taoensso.sente :as sente]
-            [taoensso.sente.server-adapters.http-kit :refer (sente-web-server-adapter)]
-
+            #_[aleph.http :as http]
+            #_[manifold.stream :as s]
+            #_[manifold.deferred :as d]
+            
             [figwheel-sidecar.repl :as r]
             [figwheel-sidecar.repl-api :as ra]))
 
@@ -40,56 +43,106 @@
   (ra/cljs-repl))
 
 ;; ===
+(def non-websocket-request
+  {:status 400
+   :headers {"content-type" "application/text"}
+   :body "Expected a websocket request."})
+
 (defn index-handler [request]
+  #_(println request)
   (res/response "Homepage"))
 
 (defn landing-handler [request]
+  #_(println request)
   (res/response "Landing"))
 
-(def thing
-  (let [{:keys [ch-recv send-fn ajax-post-fn
-                ajax-get-or-ws-handshake-fn connected-uids]}
-        (sente/make-channel-socket! sente-web-server-adapter {})
+#_(defn streaming-handler [{:keys [ws-channel] :as req}]
+  (go
+    (let [{:keys [message]} (<! ws-channel)]
+      (println "Message received:" message)
+      (>! ws-channel "Hello client from server!")
+      (close! ws-channel))))
 
-        ring-ajax-post                ajax-post-fn
-        ring-ajax-get-or-ws-handshake ajax-get-or-ws-handshake-fn
-        ch-chsk                       ch-recv ; ChannelSocket's receive channel
-        chsk-send!                    send-fn ; ChannelSocket's send API fn
-        connected-uids                connected-uids] ; Watchable, read-only atom
+(defn streaming-handler [{:keys [ws-channel] :as req}]
+  (>pprint req)
+  (go
+    (let [{:keys [message]} (<! ws-channel)]
+      (prn "Message received:" message)
+      (>! ws-channel "Hello client from server!")
+      )))
 
-    (defroutes routes
-      (GET "/" req (index-handler req))
-      (GET "/landing" req (landing-handler))
+#_(defn streaming-handler [req]
+  (println req)
+  (->
+   (d/let-flow [socket (http/websocket-connection req)]
+     (s/connect socket socket))
+   (d/catch
+       (fn [_]
+         non-websocket-request))))
 
-      (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))
-      (POST "/chsk" req (ring-ajax-post               req))
+#_(defroutes routes
+  (GET "/" req (index-handler req))
+  (GET "/landing" req (landing-handler req))
 
-      (route/resources "/")
-      (route/not-found "Page not found"))))
+  (route/resources "/")
+  (route/not-found "Page not found"))
+
 
 (def app
+  (wrap-websocket-handler
+   (compojure/routes
+    (GET "/"           req (index-handler req))
+    (GET "/landing"    req (landing-handler req))
+    (GET "/streaming"  req (streaming-handler req))
+    (route/resources "/")
+    (route/not-found "Page not found"))))
+
+
+#_(defn send-to-client [msg]
+  (let [uid (:any @connected-uids)]
+    (println uid)
+    (println msg)
+    (chsk-send! nil [:some/msg msg])))
+
+#_(def app
   (-> routes
       (handler/site)))
 
 
 ;; ===
-(defonce server (atom nil))
-
-(defn start-server []
+#_(defonce server (atom nil))
+#_(defn start-server []
   (reset! server (server/run-server #'app {:port 8080})))
 
-(defn stop-server []
+#_(defn stop-server []
   (when-not (nil? @server)
     ;; graceful shutdown: wait 100ms for existing requests to be finished
     ;; :timeout is optional, when no timeout, stop immediately
     (@server :timeout 100)
     (reset! server nil)))
 
-(defn -main [&args]
+#_(defn -main [&args]
   ;; The #' is useful when you want to hot-reload code
   ;; You may want to take a look: https://github.com/clojure/tools.namespace
   ;; and http://http-kit.org/migration.html#reload
   (start-server))
+
+(defonce !server
+  (atom nil))
+
+(defn start-server []
+  (swap! !server
+         (fn [running-server]
+           (or running-server
+               (httpkit/run-server app {:port 8080})))))
+
+(defn stop-server []
+  (swap! !server
+         (fn [running-server]
+           (when running-server
+             ;; call the server to stop it
+             (running-server)
+             nil))))
 
 
 (comment
@@ -100,4 +153,4 @@
   (stop)
   (stop-server)
 
-  )
+  (send-to-client {:foo :bar}))
