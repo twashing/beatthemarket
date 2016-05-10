@@ -7,14 +7,17 @@
 (enable-console-print!)
 (println "Hello World")
 
-(go
+#_(go-loop []
   (let [{:keys [ws-channel error]} (<! (ws-ch "ws://localhost:8080/streaming"))]
-    (println (str  "ws-channel: " ws-channel))
+    (js/console.log (str "ws-channel: " ws-channel))
     (if-not error
-      (>! ws-channel "Hello server from client!")
-      (js/console.log "Error:" (pr-str error)))))
+      (let [msg (<! ws-channel)]
+        (js/console.log "in loop: " msg)
+        (>! ws-channel "Hello server from client!")
+        (recur))
+      (js/console.log "Error: " (pr-str error)))))
 
-#_(go
+(go
   (let [{:keys [ws-channel]} (<! (ws-ch "ws://localhost:8080/streaming"))
         {:keys [message error]} (<! ws-channel)]
     (js/console.log ws-channel)

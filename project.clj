@@ -8,7 +8,6 @@
                  [http-kit "2.1.18"]
                  [compojure "1.5.0"]
                  [ring/ring-defaults "0.1.5"]
-                 [aleph "0.4.1"]
                  [com.taoensso/timbre "4.3.1"]
                  [com.yahoofinance-api/YahooFinanceAPI "3.2.0"]
                  [jarohen/chime "0.1.9"]
