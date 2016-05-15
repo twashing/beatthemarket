@@ -8,19 +8,32 @@
 
 (defn kill-feed-fn [])
 
-(defn start-feed-internal [stocks]
-  (let [every-second (rest    ; excludes *right now*
-                      (periodic-seq (t/now)
-                                    (-> 1 t/seconds)))]
-    (chime-at every-second
-              (fn [time]
-                (println (str time " Stocks > " (YahooFinance/get (into-array stocks))))))))
+(defn start-feed-internal
+  ([stocks]
+   (start-feed-internal stocks
+                        (fn [results]
+                          (println (str " Stocks > " results)))))
+  ([stocks handle-fn]
+   (let [every-second (rest    ; excludes *right now*
+                       (periodic-seq (t/now)
+                                     (-> 1 t/seconds)))]
+     (chime-at every-second
+               (fn [time]
+                 (let [results (YahooFinance/get (into-array stocks))]
+                   (handle-fn results)))))))
 
-(defn start-feed [stocks]
-  (alter-var-root
-   (var kill-feed-fn)
-   (fn [f]
-     (start-feed-internal stocks))))
+(defn start-feed
+
+  ([stocks]
+   (start-feed stocks
+               (fn [results]
+                 (println (str " Stocks > " results)))))
+
+  ([stocks handler-fn]
+   (alter-var-root
+    (var kill-feed-fn)
+    (fn [f]
+      (start-feed-internal stocks handler-fn)))))
 
 (defn stop-feed []
   (kill-feed-fn))

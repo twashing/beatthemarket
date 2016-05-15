@@ -11,7 +11,10 @@
             [chord.http-kit :refer [wrap-websocket-handler with-channel]]
 
             [figwheel-sidecar.repl :as r]
-            [figwheel-sidecar.repl-api :as ra]))
+            [figwheel-sidecar.repl-api :as ra]
+
+            [beatthemarket.feed.market :as market])
+  (:import [yahoofinance YahooFinance]))
 
 
 ;; ===
@@ -48,23 +51,29 @@
   (println request)
   (res/response "Homepage"))
 
-
-(defn streaming-handler [{:keys [ws-channel] :as req}]
+(defn streaming-handler [{:keys [ws-channel async-channel] :as req}]
   (go
+    (>! ws-channel "First message from server!")
+
+    (def write-ch ws-channel)
+    
     (let [{:keys [message]} (<! ws-channel)]
       (println "Message received:" message)
-      (>! ws-channel "Hello client from server!")
       #_(close! ws-channel))))
 
+#_(def write-ch (chan))
 
 (def app
   (handler/site
    (compojure/routes
     (GET "/"           req (index-handler req))
-    (GET "/streaming"  req (streaming-handler req))
+    (GET "/streaming"  req ((wrap-websocket-handler streaming-handler #_{:write-ch write-ch}) req))
     (route/resources "/")
     (route/not-found "Page not found"))))
 
+(defn write-to-client [msg]
+  (go
+    (>! write-ch msg)))
 
 ;; ====
 (defonce server (atom nil))
@@ -79,6 +88,23 @@
     (@server :timeout 100)
     (reset! server nil)))
 
+(defn start-all []
+  (start-server)
+  (start)
+  (market/start-feed ["IBM" "AAPL" "YHOO"]
+                     (fn [results]
+                       (let [rs (into {} results)
+                             ks (keys rs)
+                             vs (vals rs)
+                             vss vs
+                             formatted-results (zipmap ks vss)]
+                         (write-to-client formatted-results)
+                         (println formatted-results)))))
+
+(defn stop-all []
+  (stop)
+  (stop-server)
+  (market/stop-feed))
 
 (comment
 
@@ -89,6 +115,26 @@
   (stop)
   (stop-server)
 
+  (write-to-client {:msg "Zapp!!"})
+
+  (market/start-feed ["IBM" "AAPL" "YHOO"]
+                     (fn [results]
+                       (let [rs (into {} results)
+                             ks (keys rs)
+                             vs (vals rs)
+                             #_vss #_(map (fn [ech]
+                                        (let [stats (bean (:stats ech))]
+                                          (-> (bean ech)
+                                              (dissoc :dividend :history :stats)
+                                              (assoc :stats stats))))
+                                          (vals rs))
+                             vss vs
+                             formatted-results (zipmap ks vss)]
+                         (write-to-client formatted-results)
+                         (println formatted-results))))
+
+  (market/stop-feed)
+  
   ;; one time cljs build
   (require 'cljs.build.api)
   (cljs.build.api/build "src"
